@@ -13,12 +13,6 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]
 
-    def perform_create(self, serializer):
-        # Automatically set 'is_active' to True during registration
-        user = serializer.save()
-        user.is_active = True  # Ensure user is active
-        user.save()
-
 # Retrieve, Update, Delete
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
@@ -51,7 +45,13 @@ class ApplicationViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def perform_create(self, serializer):
-        serializer.save(applicant=self.request.user)
+        # Automatically assign the user who is making the request to the applicant field
+        user = self.request.user  # The user who is authenticated
+        # Get the job ID from the serializer data and assign it to the application
+        job_id = self.request.data.get('job')  # Retrieve the job ID from the request
+        job = Job.objects.get(id=job_id)  # Fetch the job object
+
+        serializer.save(applicant=user, job=job)  # Save the application with both applicant and job
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
