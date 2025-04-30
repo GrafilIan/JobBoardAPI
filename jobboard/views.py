@@ -1,9 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.shortcuts import render
-from rest_framework import viewsets, permissions, generics, status
+from rest_framework import viewsets, permissions, generics, status, serializers
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
 from .models import Job, Application, User
 from .serializers import JobSerializer, ApplicationSerializer, UserSerializer
 
@@ -40,22 +41,34 @@ class JobViewSet(viewsets.ModelViewSet):
 
 
 class ApplicationViewSet(viewsets.ModelViewSet):
-    queryset = Application.objects.all()
     serializer_class = ApplicationSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        # Automatically assign the user who is making the request to the applicant field
-        user = self.request.user  # The user who is authenticated
-        # Get the job ID from the serializer data and assign it to the application
-        job_id = self.request.data.get('job')  # Retrieve the job ID from the request
-        job = Job.objects.get(id=job_id)  # Fetch the job object
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_employer:
+            # Show only applications for jobs created by this employer
+            return Application.objects.filter(job__created_by=user)
+        else:
+            # Show only applications made by this job seeker
+            return Application.objects.filter(applicant=user)
 
-        serializer.save(applicant=user, job=job)  # Save the application with both applicant and job
+    def perform_create(self, serializer):
+        user = self.request.user
+        job_id = self.request.data.get('job')
+
+        try:
+            job = Job.objects.get(id=job_id)
+        except Job.DoesNotExist:
+            raise serializers.ValidationError("Job not found.")
+
+        serializer.save(applicant=user, job=job)
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
         application = self.get_object()
+        if application.job.created_by != request.user:
+            return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
         application.status = 'accepted'
         application.save()
         return Response({"status": "accepted"}, status=status.HTTP_200_OK)
@@ -63,9 +76,13 @@ class ApplicationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         application = self.get_object()
+        if application.job.created_by != request.user:
+            return Response({"error": "Not authorized"}, status=status.HTTP_403_FORBIDDEN)
         application.status = 'rejected'
         application.save()
         return Response({"status": "rejected"}, status=status.HTTP_200_OK)
+
+
 
 
 # Create your views here.

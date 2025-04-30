@@ -24,13 +24,20 @@ class JobSerializer(serializers.ModelSerializer):
 class ApplicantSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'is_employer']  # Only necessary fields
+        fields = ['id', 'username', 'email']  # Only necessary fields
 
 # Serializer for the Application model
 class ApplicationSerializer(serializers.ModelSerializer):
-    job = serializers.PrimaryKeyRelatedField(queryset=Job.objects.all())  # Use PrimaryKeyRelatedField
-    applicant = UserSerializer(read_only=True)
+    job = JobSerializer(read_only=True)  # Use JobSerializer to show full job details
+    applicant = ApplicantSerializer(read_only=True)  # Use ApplicantSerializer to show the reduced applicant fields
 
     class Meta:
         model = Application
         fields = ['id', 'job', 'applicant', 'cover_letter', 'status', 'applied_at']
+
+    def get_applicant(self, obj):
+        # Only return selected applicant fields
+        return {
+            "username": obj.applicant.username,
+            "email": obj.applicant.email
+        }
