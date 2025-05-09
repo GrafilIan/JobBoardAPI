@@ -17,9 +17,10 @@ class UserSerializer(serializers.ModelSerializer):
 
 # Serializer for the Job model
 class JobSerializer(serializers.ModelSerializer):
+    created_by = serializers.CharField(source='created_by.username', read_only=True)
     class Meta:
         model = Job
-        fields = ['id', 'title', 'description', 'location', 'salary']
+        fields = ['id', 'title', 'description', 'location', 'salary', 'created_by']
 
 class ApplicantSerializer(serializers.ModelSerializer):
     class Meta:

@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import render
 from rest_framework import viewsets, permissions, generics, status, serializers
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -19,7 +20,21 @@ class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'pk'  # To use user ID for lookup
+    lookup_field = 'pk'
+
+    def get_object(self):
+        obj = super().get_object()
+        user = self.request.user
+
+        # Employers can access all users
+        if user.is_employer:
+            return obj
+
+        # Job seekers can only access their own data
+        if obj != user:
+            raise PermissionDenied("You are not allowed to access this user.")
+
+        return obj
 
 # Optional: To get a list of users (Read)
 class UserListView(generics.ListAPIView):
@@ -27,14 +42,24 @@ class UserListView(generics.ListAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        if not self.request.user.is_employer:
+            raise PermissionDenied("Only employers can view the list of users.")
+        return User.objects.all()
+
 class JobViewSet(viewsets.ModelViewSet):
-    queryset = Job.objects.all()
     serializer_class = JobSerializer
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [IsAuthenticated()]
         return [permissions.AllowAny()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_authenticated and user.is_employer:
+            return Job.objects.filter(created_by=user)
+        return Job.objects.all()  # Optional: show all jobs to public or seekers
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -61,6 +86,10 @@ class ApplicationViewSet(viewsets.ModelViewSet):
             job = Job.objects.get(id=job_id)
         except Job.DoesNotExist:
             raise serializers.ValidationError("Job not found.")
+
+        # Check if the user has already applied for this job
+        if Application.objects.filter(job=job, applicant=user).exists():
+            raise serializers.ValidationError("You have already applied for this job.")
 
         serializer.save(applicant=user, job=job)
 
