@@ -34,7 +34,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Application
-        fields = ['id', 'job', 'applicant', 'cover_letter', 'status', 'applied_at']
+        fields = ['id', 'job', 'applicant', 'cover_letter', 'file_upload', 'status', 'applied_at']
 
     def get_applicant(self, obj):
         # Only return selected applicant fields

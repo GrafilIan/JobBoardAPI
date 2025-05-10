@@ -35,23 +35,8 @@ class Application(models.Model):
     cover_letter = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     applied_at = models.DateTimeField(default=timezone.now)
+    file_upload = models.FileField(upload_to='uploads/resume', null=True, blank=True)
 
     def __str__(self):
         return f"{self.applicant.username} applied to {self.job.title}"
 
-# Application Model
-class Application(models.Model):
-    STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('accepted', 'Accepted'),
-        ('rejected', 'Rejected'),
-    )
-
-    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='applications')
-    applicant = models.ForeignKey(User, on_delete=models.CASCADE, related_name='applications')
-    cover_letter = models.TextField()
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
-    applied_at = models.DateTimeField(default=timezone.now)
-
-    def __str__(self):
-        return f"{self.applicant.username} applied to {self.job.title}"
